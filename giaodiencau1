@@ -1,0 +1,126 @@
+ methods (Access = private)
+        % Callback for Calculate Button
+        function calculateButtonPushed(app, ~)
+            % Lấy phương trình từ người dùng
+            eqn = app.equationField.Value;
+            try
+                f = str2func(['@(x) ' eqn]); % Chuyển thành hàm ẩn danh
+            catch
+                uialert(app.UIFigure, 'Phương trình không hợp lệ!', 'Lỗi');
+                return;
+            end
+
+            % Lấy khoảng phân ly
+            interval = str2double(split(app.intervalField.Value, ','));
+            if numel(interval) ~= 2 || any(isnan(interval))
+                uialert(app.UIFigure, 'Khoảng nhập không hợp lệ! Hãy nhập dạng [a,b]', 'Lỗi');
+                return;
+            end
+            a = interval(1);
+            b = interval(2);
+
+            % Lấy phương pháp từ dropdown
+            method = app.methodDropDown.Value;
+
+            % Thiết lập tham số thuật toán
+            maxIter = 100;  % Số lần lặp tối đa
+            tol = 1e-6;     % Sai số
+
+            % Tính toán nghiệm
+            switch method
+                case 'Chia đôi'
+                    [root, iter] = bisectionMethod(app, f, a, b, tol, maxIter);
+                case 'Lặp đơn'
+                    % Giả định x0 là điểm giữa khoảng [a, b]
+                    [root, iter] = fixedPointIteration(app, f, (a+b)/2, tol, maxIter);
+                case 'Newton'
+                    % Sử dụng đạo hàm
+                    df = matlabFunction(diff(sym(eqn)));
+                    [root, iter] = newtonRaphsonMethod(app, f, df, (a+b)/2, tol, maxIter);
+                otherwise
+                    uialert(app.UIFigure, 'Phương pháp không hợp lệ!', 'Lỗi');
+                    return;
+            end
+
+            % Hiển thị kết quả
+            if isnan(root)
+                app.resultLabel.Text = 'Không tìm được nghiệm!';
+                app.iterationLabel.Text = '';
+            else
+                app.resultLabel.Text = ['Nghiệm: ', num2str(root)];
+                app.iterationLabel.Text = ['Số lần lặp: ', num2str(iter)];
+            end
+
+            % Vẽ đồ thị hàm số
+            x = linspace(a, b, 100);
+            y = arrayfun(f, x);
+            plot(app.UIAxes, x, y, '-b', root, f(root), 'or');
+            xlabel(app.UIAxes, 'x');
+            ylabel(app.UIAxes, 'f(x)');
+            title(app.UIAxes, 'Đồ thị hàm số');
+            grid(app.UIAxes, 'on');
+        end
+        
+    
+        function [root, iter] = bisectionMethod(app, f, a, b, tol, maxIter)
+            iter = 0;
+            while iter < maxIter
+                c = (a + b) / 2; % Trung điểm
+                if abs(f(c)) < tol || (b - a) / 2 < tol
+                    root = c;
+                    return;
+                end
+                if f(a) * f(c) < 0
+                    b = c;
+                else
+                    a = c;
+                end
+                iter = iter + 1;
+            end
+            root = NaN; % Không tìm được nghiệm
+        end
+
+        % Lặp đơn
+        function [root, iter] = fixedPointIteration(app, f, x0, tol, maxIter)
+            iter = 0;
+            x = x0;
+            while iter < maxIter
+                x_new = f(x);
+                if abs(x_new - x) < tol
+                    root = x_new;
+                    return;
+                end
+                x = x_new;
+                iter = iter + 1;
+            end
+            root = NaN; % Không tìm được nghiệm
+        end
+
+        % Newton-Raphson
+        function [root, iter] = newtonRaphsonMethod(app, f, df, x0, tol, maxIter)
+            iter = 0;
+            x = x0;
+            while iter < maxIter
+                if abs(df(x)) < tol
+                    root = NaN; % Tránh chia cho 0
+                    return;
+                end
+                x_new = x - f(x) / df(x);
+                if abs(x_new - x) < tol
+                    root = x_new;
+                    return;
+                end
+                x = x_new;
+                iter = iter + 1;
+            end
+            root = NaN; % Không tìm được nghiệm
+        end
+    end
+
+    % Component initialization
+    methods (Access = private)
+        function createComponents(app)
+            % Tự động sinh mã từ App Designer (UI Elements)
+        end
+    end
+    end
